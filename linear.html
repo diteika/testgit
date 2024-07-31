@@ -1,0 +1,301 @@
+<html><head><base href="https://linear-regression-solver.streamlit.app/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linear Regression Solver Dashboard</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+  :root {
+    --primary: #4e73df;
+    --success: #1cc88a;
+    --info: #36b9cc;
+    --warning: #f6c23e;
+    --danger: #e74a3b;
+    --secondary: #858796;
+    --light: #f8f9fc;
+    --dark: #5a5c69;
+  }
+  
+  body {
+    font-family: Nunito, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--light);
+  }
+  
+  .bg-gradient-primary {
+    background-color: var(--primary);
+    background-image: linear-gradient(180deg, var(--primary) 10%, #224abe 100%);
+    background-size: cover;
+  }
+  
+  .sidebar {
+    min-height: 100vh;
+  }
+  
+  .sidebar .nav-item .nav-link {
+    padding: 0.75rem 1rem;
+    color: rgba(255,255,255,.8);
+  }
+  
+  .sidebar .nav-item .nav-link:hover {
+    color: #fff;
+  }
+  
+  .sidebar-dark .sidebar-heading {
+    color: rgba(255,255,255,.4);
+  }
+  
+  .topbar {
+    height: 4.375rem;
+  }
+  
+  .card {
+    box-shadow: 0 .15rem 1.75rem 0 rgba(58,59,69,.15)!important;
+  }
+  
+  .card-header {
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+  }
+  
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 0.5rem;
+    border-radius: 5px;
+    background: #e9ecef;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity .2s;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Sidebar -->
+      <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-gradient-primary sidebar collapse">
+        <div class="position-sticky pt-3">
+          <a class="sidebar-brand d-flex align-items-center justify-content-center" href="#">
+            <div class="sidebar-brand-icon rotate-n-15">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="sidebar-brand-text mx-3">LR Solver</div>
+          </a>
+          <hr class="sidebar-divider my-0">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link active" href="#">
+                <i class="fas fa-fw fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">
+                <i class="fas fa-fw fa-chart-area"></i>
+                <span>Regression Analysis</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">
+                <i class="fas fa-fw fa-table"></i>
+                <span>Data Management</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Main content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+          <h1 class="h2">Linear Regression Solver</h1>
+        </div>
+
+        <div id="app">
+          <div id="loading" class="text-center">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading Python environment...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    async function main() {
+      let pyodide = await loadPyodide();
+      await pyodide.loadPackage(["numpy", "matplotlib"]);
+      
+      const code = `
+import numpy as np
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+
+def generate_data(a, c, n):
+    x = np.linspace(-100, 100, n)
+    y = a * x + 50 + c * np.random.normal(0, 1, n)
+    return x, y
+
+def linear_regression(x, y):
+    A = np.vstack([x, np.ones(len(x))]).T
+    m, b = np.linalg.lstsq(A, y, rcond=None)[0]
+    return m, b
+
+def plot_regression(x, y, m, b):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.scatter(x, y, alpha=0.5, color='#4e73df')
+    ax.plot(x, m*x + b, color='#e74a3b', linewidth=2)
+    ax.set_xlabel('X', fontsize=12)
+    ax.set_ylabel('Y', fontsize=12)
+    ax.set_title('Linear Regression', fontsize=16)
+    ax.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    
+    buf = BytesIO()
+    fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    buf.seek(0)
+    img_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+    plt.close(fig)
+    
+    return f'<img src="data:image/png;base64,{img_str}" alt="Linear Regression Plot" class="img-fluid">'
+
+def solve_regression(a, c, n):
+    x, y = generate_data(a, c, n)
+    m, b = linear_regression(x, y)
+    plot_html = plot_regression(x, y, m, b)
+    return m, b, plot_html
+      `;
+      
+      pyodide.runPython(code);
+      
+      // Hide loading message
+      document.getElementById('loading').style.display = 'none';
+      
+      // Create interface
+      const app = document.getElementById('app');
+      app.innerHTML = `
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Parameters</h6>
+              </div>
+              <div class="card-body">
+                <div id="sliders"></div>
+                <button id="solveButton" class="btn btn-primary btn-block mt-3">
+                  Solve Regression
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-8">
+            <div class="card shadow mb-4">
+              <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Results</h6>
+              </div>
+              <div class="card-body">
+                <div id="stats" class="row mb-4"></div>
+                <div id="plot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      const sliders = [
+        { name: 'Slope (a)', id: 'a', min: -10, max: 10, value: 1, step: 0.1 },
+        { name: 'Noise factor (c)', id: 'c', min: 1, max: 300, value: 50, step: 1 },
+        { name: 'Number of points (n)', id: 'n', min: 100, max: 1000, value: 500, step: 50 }
+      ];
+      
+      const slidersContainer = document.getElementById('sliders');
+      sliders.forEach(slider => {
+        const div = document.createElement('div');
+        div.className = 'mb-3';
+        div.innerHTML = `
+          <label for="${slider.id}" class="form-label small font-weight-bold text-primary">${slider.name}</label>
+          <div class="d-flex align-items-center">
+            <input type="range" class="form-range flex-grow-1 me-2" id="${slider.id}" name="${slider.id}" 
+                   min="${slider.min}" max="${slider.max}" value="${slider.value}" step="${slider.step}"
+                   oninput="document.getElementById('${slider.id}_value').value = this.value">
+            <input type="number" class="form-control form-control-sm" style="width: 80px;" id="${slider.id}_value" value="${slider.value}" 
+                   min="${slider.min}" max="${slider.max}" step="${slider.step}"
+                   oninput="document.getElementById('${slider.id}').value = this.value">
+          </div>
+        `;
+        slidersContainer.appendChild(div);
+      });
+      
+      document.getElementById('solveButton').onclick = async () => {
+        const a = parseFloat(document.getElementById('a').value);
+        const c = parseFloat(document.getElementById('c').value);
+        const n = parseInt(document.getElementById('n').value);
+        
+        const result = await pyodide.runPythonAsync(`
+          m, b, plot_html = solve_regression(${a}, ${c}, ${n})
+          f'Estimated slope: {m:.2f}\\nEstimated intercept: {b:.2f}\\n{plot_html}'
+        `);
+        
+        const [slope, intercept, plot] = result.split('\n');
+        document.getElementById('stats').innerHTML = `
+          <div class="col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+              <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                  <div class="col mr-2">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Estimated Slope</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">${slope.split(': ')[1]}</div>
+                  </div>
+                  <div class="col-auto">
+                    <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+              <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                  <div class="col mr-2">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Estimated Intercept</div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800">${intercept.split(': ')[1]}</div>
+                  </div>
+                  <div class="col-auto">
+                    <i class="fas fa-arrow-right fa-2x text-gray-300"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        document.getElementById('plot').innerHTML = plot;
+      };
+    }
+    
+    main();
+  </script>
+</body></html>
