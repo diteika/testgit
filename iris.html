@@ -1,0 +1,193 @@
+<html><head><base href="https://websim.ai/iris_analysis/">
+<title>Iris Dataset Analysis Results</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  h1, h2 {
+    color: #2c3e50;
+  }
+  .chart {
+    width: 100%;
+    height: 600px;
+    margin-bottom: 20px;
+  }
+  #accuracyTable {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  #accuracyTable th, #accuracyTable td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+  }
+  #accuracyTable th {
+    background-color: #f2f2f2;
+  }
+  .control-panel {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  select {
+    padding: 5px;
+    font-size: 16px;
+  }
+</style>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <h1>Iris Dataset Analysis Results</h1>
+  
+  <h2>1. Multivariate Scatter Plot Analysis</h2>
+  <div class="control-panel">
+    <div>
+      <label for="x-axis">X-axis:</label>
+      <select id="x-axis" onchange="updatePlot()">
+        <option value="0">Sepal Length</option>
+        <option value="1">Sepal Width</option>
+        <option value="2">Petal Length</option>
+        <option value="3">Petal Width</option>
+      </select>
+    </div>
+    <div>
+      <label for="y-axis">Y-axis:</label>
+      <select id="y-axis" onchange="updatePlot()">
+        <option value="0">Sepal Length</option>
+        <option value="1">Sepal Width</option>
+        <option value="2" selected>Petal Length</option>
+        <option value="3">Petal Width</option>
+      </select>
+    </div>
+  </div>
+  <div id="scatterplot" class="chart"></div>
+
+  <h2>2. Logistic Regression Accuracy</h2>
+  <p>Overall accuracy of the logistic regression model: <strong id="overallAccuracy"></strong></p>
+  
+  <h3>Feature Pair Accuracies</h3>
+  <table id="accuracyTable">
+    <tr>
+      <th></th>
+      <th>Sepal Length</th>
+      <th>Sepal Width</th>
+      <th>Petal Length</th>
+      <th>Petal Width</th>
+    </tr>
+    <tr>
+      <th>Sepal Length</th>
+      <td>-</td>
+      <td id="acc01"></td>
+      <td id="acc02"></td>
+      <td id="acc03"></td>
+    </tr>
+    <tr>
+      <th>Sepal Width</th>
+      <td id="acc10"></td>
+      <td>-</td>
+      <td id="acc12"></td>
+      <td id="acc13"></td>
+    </tr>
+    <tr>
+      <th>Petal Length</th>
+      <td id="acc20"></td>
+      <td id="acc21"></td>
+      <td>-</td>
+      <td id="acc23"></td>
+    </tr>
+    <tr>
+      <th>Petal Width</th>
+      <td id="acc30"></td>
+      <td id="acc31"></td>
+      <td id="acc32"></td>
+      <td>-</td>
+    </tr>
+  </table>
+
+  <script>
+    // Simulated results from Python analysis
+    const features = ['Sepal Length', 'Sepal Width', 'Petal Length', 'Petal Width'];
+    const species = ['Setosa', 'Versicolor', 'Virginica'];
+    const colors = ['red', 'green', 'blue'];
+
+    // Simulated dataset
+    const irisData = [
+      // Setosa
+      ...Array(50).fill().map(() => ({
+        sepalLength: 4 + Math.random() * 1.5,
+        sepalWidth: 2.5 + Math.random() * 1.5,
+        petalLength: 1 + Math.random(),
+        petalWidth: 0.1 + Math.random() * 0.5,
+        species: 'Setosa'
+      })),
+      // Versicolor
+      ...Array(50).fill().map(() => ({
+        sepalLength: 5 + Math.random() * 1.5,
+        sepalWidth: 2 + Math.random() * 1,
+        petalLength: 3 + Math.random() * 1.5,
+        petalWidth: 1 + Math.random(),
+        species: 'Versicolor'
+      })),
+      // Virginica
+      ...Array(50).fill().map(() => ({
+        sepalLength: 6 + Math.random() * 1.5,
+        sepalWidth: 2.5 + Math.random() * 1.5,
+        petalLength: 4.5 + Math.random() * 2,
+        petalWidth: 1.5 + Math.random() * 1,
+        species: 'Virginica'
+      }))
+    ];
+
+    function updatePlot() {
+      const xFeature = parseInt(document.getElementById('x-axis').value);
+      const yFeature = parseInt(document.getElementById('y-axis').value);
+
+      const data = species.map((s, i) => ({
+        x: irisData.filter(d => d.species === s).map(d => Object.values(d)[xFeature]),
+        y: irisData.filter(d => d.species === s).map(d => Object.values(d)[yFeature]),
+        mode: 'markers',
+        type: 'scatter',
+        name: s,
+        marker: { size: 8, color: colors[i] }
+      }));
+
+      const layout = {
+        title: 'Iris Dataset Scatter Plot',
+        xaxis: { title: features[xFeature] },
+        yaxis: { title: features[yFeature] },
+        height: 600,
+        width: 800
+      };
+
+      Plotly.newPlot('scatterplot', data, layout);
+    }
+
+    // Initial plot
+    updatePlot();
+
+    // Simulated accuracy results
+    const overallAccuracy = 0.9600;
+    document.getElementById('overallAccuracy').textContent = (overallAccuracy * 100).toFixed(2) + '%';
+
+    const pairAccuracies = [
+      ['-', 0.8333, 0.9667, 0.9333],
+      [0.8333, '-', 0.9333, 0.9000],
+      [0.9667, 0.9333, '-', 0.9667],
+      [0.9333, 0.9000, 0.9667, '-']
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        if (i !== j) {
+          document.getElementById(`acc${i}${j}`).textContent = (pairAccuracies[i][j] * 100).toFixed(2) + '%';
+        }
+      }
+    }
+  </script>
+</body></html>
