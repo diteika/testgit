@@ -1,0 +1,362 @@
+<html><head><base href="https://websim.ai/svm_visualization/">
+<title>SVM Visualization Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.12.1/plotly.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/9.5.1/math.min.js"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+  }
+  .container {
+    display: flex;
+    height: 100vh;
+  }
+  .sidebar {
+    width: 250px;
+    padding: 20px;
+    background-color: #2c3e50;
+    color: white;
+  }
+  .main-content {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  h1 {
+    color: #2c3e50;
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+  .plot-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+  }
+  .plot {
+    width: 48%;
+    height: 400px;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+  label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 5px;
+  }
+  select, button {
+    width: 100%;
+    margin-bottom: 15px;
+    padding: 5px;
+  }
+  button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  button:hover {
+    background-color: #2980b9;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <h2>Controls</h2>
+    <label for="kernelFunction">Kernel Function:</label>
+    <select id="kernelFunction">
+      <option value="rbf">Radial Basis Function (RBF)</option>
+      <option value="linear">Linear</option>
+      <option value="poly">Polynomial</option>
+      <option value="sigmoid">Sigmoid</option>
+      <option value="laplacian">Laplacian</option>
+      <option value="rational_quadratic">Rational Quadratic</option>
+      <option value="multiquadric">Multiquadric</option>
+      <option value="inverse_multiquadric">Inverse Multiquadric</option>
+      <option value="cauchy">Cauchy</option>
+      <option value="exponential">Exponential</option>
+    </select>
+
+    <button id="newDatasetBtn">Create New Dataset</button>
+  </div>
+
+  <div class="main-content">
+    <h1>Interactive SVM Visualization with Hyperplane and Decision Boundary</h1>
+    <div class="plot-container">
+      <div id="svm2d" class="plot"></div>
+      <div id="svm3d" class="plot"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// JavaScript code for SVM visualization
+let data2D, data3D;
+let layout2D, layout3D;
+let currentDataset;
+let svmModel;
+
+function generateData(n = 100) {
+  const X = [];
+  const y = [];
+  for (let i = 0; i < n; i++) {
+    const x1 = Math.random() * 2 - 1;
+    const x2 = Math.random() * 2 - 1;
+    X.push([x1, x2]);
+    y.push(x1*x1 + x2*x2 < 0.5 ? -1 : 1);
+  }
+  return { X, y };
+}
+
+function kernelFunction(x1, x2, type) {
+  const param = 1; // Fixed parameter for simplicity
+  switch(type) {
+    case 'linear':
+      return math.dot(x1, x2);
+    case 'rbf':
+      return Math.exp(-param * math.norm(math.subtract(x1, x2))**2);
+    case 'poly':
+      return (math.dot(x1, x2) + 1)**param;
+    case 'sigmoid':
+      return Math.tanh(param * math.dot(x1, x2));
+    case 'laplacian':
+      return Math.exp(-param * math.norm(math.subtract(x1, x2)));
+    case 'rational_quadratic':
+      return 1 - (math.norm(math.subtract(x1, x2))**2) / (math.norm(math.subtract(x1, x2))**2 + param);
+    case 'multiquadric':
+      return Math.sqrt((math.norm(math.subtract(x1, x2))**2) + param**2);
+    case 'inverse_multiquadric':
+      return 1 / Math.sqrt((math.norm(math.subtract(x1, x2))**2) + param**2);
+    case 'cauchy':
+      return 1 / (1 + (math.norm(math.subtract(x1, x2))**2) / param**2);
+    case 'exponential':
+      return Math.exp(-param * math.norm(math.subtract(x1, x2)));
+    default:
+      return Math.exp(-param * math.norm(math.subtract(x1, x2))**2); // Default to RBF
+  }
+}
+
+function trainSVM(X, y, kernelType, C = 1.0, tol = 1e-3, max_iter = 100) {
+  const n_samples = X.length;
+  const alpha = new Array(n_samples).fill(0);
+  let b = 0;
+
+  function compute_kernel_matrix(X, kernelType) {
+    const n = X.length;
+    const K = [];
+    for (let i = 0; i < n; i++) {
+      K[i] = [];
+      for (let j = 0; j < n; j++) {
+        K[i][j] = kernelFunction(X[i], X[j], kernelType);
+      }
+    }
+    return K;
+  }
+
+  const K = compute_kernel_matrix(X, kernelType);
+
+  for (let iter = 0; iter < max_iter; iter++) {
+    let num_changed_alphas = 0;
+    for (let i = 0; i < n_samples; i++) {
+      const Ei = math.sum(alpha.map((aj, j) => aj * y[j] * K[i][j])) + b - y[i];
+      if ((y[i] * Ei < -tol && alpha[i] < C) || (y[i] * Ei > tol && alpha[i] > 0)) {
+        let j = i;
+        while (j === i) j = Math.floor(Math.random() * n_samples);
+        const Ej = math.sum(alpha.map((ak, k) => ak * y[k] * K[j][k])) + b - y[j];
+        
+        const alpha_i_old = alpha[i], alpha_j_old = alpha[j];
+        let L, H;
+        if (y[i] !== y[j]) {
+          L = Math.max(0, alpha[j] - alpha[i]);
+          H = Math.min(C, C + alpha[j] - alpha[i]);
+        } else {
+          L = Math.max(0, alpha[i] + alpha[j] - C);
+          H = Math.min(C, alpha[i] + alpha[j]);
+        }
+        
+        if (L === H) continue;
+        
+        const eta = 2 * K[i][j] - K[i][i] - K[j][j];
+        if (eta >= 0) continue;
+        
+        alpha[j] = alpha[j] - (y[j] * (Ei - Ej)) / eta;
+        alpha[j] = Math.min(H, Math.max(L, alpha[j]));
+        
+        if (Math.abs(alpha[j] - alpha_j_old) < 1e-5) continue;
+        
+        alpha[i] = alpha[i] + y[i] * y[j] * (alpha_j_old - alpha[j]);
+        
+        const b1 = b - Ei - y[i] * (alpha[i] - alpha_i_old) * K[i][i] - y[j] * (alpha[j] - alpha_j_old) * K[i][j];
+        const b2 = b - Ej - y[i] * (alpha[i] - alpha_i_old) * K[i][j] - y[j] * (alpha[j] - alpha_j_old) * K[j][j];
+        
+        if (0 < alpha[i] && alpha[i] < C) b = b1;
+        else if (0 < alpha[j] && alpha[j] < C) b = b2;
+        else b = (b1 + b2) / 2;
+        
+        num_changed_alphas++;
+      }
+    }
+    if (num_changed_alphas === 0) break;
+  }
+
+  const support_vectors = X.filter((_, i) => alpha[i] > 0);
+  const support_vector_labels = y.filter((_, i) => alpha[i] > 0);
+  const support_vector_alphas = alpha.filter(a => a > 0);
+
+  return {
+    support_vectors,
+    support_vector_labels,
+    support_vector_alphas,
+    b,
+    predict: function(x) {
+      return math.sign(
+        math.sum(support_vectors.map((sv, i) => 
+          support_vector_alphas[i] * support_vector_labels[i] * kernelFunction(x, sv, kernelType)
+        )) + b
+      );
+    }
+  };
+}
+
+function updatePlots() {
+  const kernelType = document.getElementById('kernelFunction').value;
+
+  // Train SVM
+  svmModel = trainSVM(currentDataset.X, currentDataset.y, kernelType);
+
+  // 2D plot
+  const trace1 = {
+    x: currentDataset.X.filter((_, i) => currentDataset.y[i] === -1).map(x => x[0]),
+    y: currentDataset.X.filter((_, i) => currentDataset.y[i] === -1).map(x => x[1]),
+    mode: 'markers',
+    type: 'scatter',
+    name: 'Class -1',
+    marker: { color: 'blue' }
+  };
+
+  const trace2 = {
+    x: currentDataset.X.filter((_, i) => currentDataset.y[i] === 1).map(x => x[0]),
+    y: currentDataset.X.filter((_, i) => currentDataset.y[i] === 1).map(x => x[1]),
+    mode: 'markers',
+    type: 'scatter',
+    name: 'Class 1',
+    marker: { color: 'red' }
+  };
+
+  // Decision boundary
+  const x1_range = math.range(-1, 1, 0.02).toArray();
+  const x2_range = math.range(-1, 1, 0.02).toArray();
+  const boundary_x = [];
+  const boundary_y = [];
+  const z_values = [];
+
+  for (let x1 of x1_range) {
+    for (let x2 of x2_range) {
+      const z = svmModel.predict([x1, x2]);
+      boundary_x.push(x1);
+      boundary_y.push(x2);
+      z_values.push(z);
+    }
+  }
+
+  const trace3 = {
+    x: boundary_x,
+    y: boundary_y,
+    z: z_values,
+    type: 'contour',
+    colorscale: [
+      [0, 'rgb(166,206,227)'],
+      [0.5, 'rgb(255,255,255)'],
+      [1, 'rgb(253,156,167)']
+    ],
+    contours: {
+      coloring: 'lines',
+      showlabels: true
+    },
+    colorbar: {
+      title: 'Decision Boundary',
+      titleside: 'right'
+    },
+    showscale: false
+  };
+
+  data2D = [trace3, trace1, trace2];
+  layout2D = {
+    title: '2D SVM Visualization',
+    xaxis: { title: 'X1', range: [-1, 1] },
+    yaxis: { title: 'X2', range: [-1, 1] }
+  };
+
+  // 3D plot
+  const x1 = math.range(-1, 1, 0.05).toArray();
+  const x2 = math.range(-1, 1, 0.05).toArray();
+  const z = [];
+
+  for (let i = 0; i < x1.length; i++) {
+    z[i] = [];
+    for (let j = 0; j < x2.length; j++) {
+      const x = [x1[i], x2[j]];
+      z[i][j] = svmModel.predict(x);
+    }
+  }
+
+  const surface = {
+    z: z,
+    x: x1,
+    y: x2,
+    type: 'surface',
+    colorscale: 'RdBu',
+    showscale: false
+  };
+
+  const trace3d1 = {
+    x: currentDataset.X.filter((_, i) => currentDataset.y[i] === -1).map(x => x[0]),
+    y: currentDataset.X.filter((_, i) => currentDataset.y[i] === -1).map(x => x[1]),
+    z: currentDataset.X.filter((_, i) => currentDataset.y[i] === -1).map(() => -1),
+    mode: 'markers',
+    type: 'scatter3d',
+    name: 'Class -1',
+    marker: { color: 'blue', size: 5 }
+  };
+
+  const trace3d2 = {
+    x: currentDataset.X.filter((_, i) => currentDataset.y[i] === 1).map(x => x[0]),
+    y: currentDataset.X.filter((_, i) => currentDataset.y[i] === 1).map(x => x[1]),
+    z: currentDataset.X.filter((_, i) => currentDataset.y[i] === 1).map(() => 1),
+    mode: 'markers',
+    type: 'scatter3d',
+    name: 'Class 1',
+    marker: { color: 'red', size: 5 }
+  };
+
+  data3D = [surface, trace3d1, trace3d2];
+
+  layout3D = {
+    title: '3D SVM Visualization',
+    scene: {
+      xaxis: { title: 'X1', range: [-1, 1] },
+      yaxis: { title: 'X2', range: [-1, 1] },
+      zaxis: { title: 'Decision Function', range: [-1, 1] }
+    }
+  };
+
+  Plotly.newPlot('svm2d', data2D, layout2D);
+  Plotly.newPlot('svm3d', data3D, layout3D);
+}
+
+function createNewDataset() {
+  currentDataset = generateData();
+  updatePlots();
+}
+
+document.getElementById('kernelFunction').addEventListener('change', updatePlots);
+document.getElementById('newDatasetBtn').addEventListener('click', createNewDataset);
+
+// Initialize
+createNewDataset();
+</script>
+</body></html>
